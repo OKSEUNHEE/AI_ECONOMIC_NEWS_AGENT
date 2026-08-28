@@ -1,0 +1,13 @@
+site_id: "naver_economy"
+site_name: "Naver Economy Headline News"
+engine: "playwright"
+target_url: "https://news.naver.com/main/main.naver?mode=LSD&mid=shm&sid1=101"
+wait_time: 2
+take_screenshot: true
+
+selectors:
+  container: ".sh_headline_list > li, .sa_text"
+  fields:
+    title: ".sh_headline_title, .sa_text_title"
+    link: "a::attr(href)"
+    press: ".sh_headline_press, .sa_text_press"

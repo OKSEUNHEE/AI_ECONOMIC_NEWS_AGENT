@@ -1,0 +1,12 @@
+site_id: "hankyung_economy"
+site_name: "Korea Economic Daily News"
+engine: "requests"
+target_url: "https://www.hankyung.com/economy"
+wait_time: 0
+take_screenshot: false
+
+selectors:
+  container: ".news-list > li, .article-list > li"
+  fields:
+    title: ".news-tit, .h2-tit, .tit"
+    link: "a::attr(href)"
