@@ -4,7 +4,7 @@
 [![Python 3.12](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
 [![Playwright](https://img.shields.io/badge/Playwright-Automation-2EAD33?style=flat&logo=playwright&logoColor=white)](https://playwright.dev/)
 [![YAML](https://img.shields.io/badge/Config-YAML-CB171E?style=flat&logo=yaml&logoColor=white)](https://yaml.org/)
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=flat&logo=github&logoColor=white)](https://github.com/OKSEUNHEE/yaml_news_crawler)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-181717?style=flat&logo=github&logoColor=white)](https://github.com/OKSEUNHEE/AI_ECONOMIC_NEWS_AGENT)
 
 ---
 
@@ -65,7 +65,7 @@
 ## 📂 4. 디렉터리 및 단계별 구현 구조
 
 ```text
-yaml_news_crawler/
+AI_ECONOMIC_NEWS_AGENT/
 │
 ├── configs/
 │   └── sources.yml           # [Step 1] 국가별/주제별 수집 지시서 (API & Crawler 대상 정의)
@@ -87,7 +87,7 @@ yaml_news_crawler/
 
 ### 1) 가상환경 활성화 및 패키지 설치
 ```bash
-cd ~/yaml_news_crawler
+cd ~/AI_ECONOMIC_NEWS_AGENT
 source .venv/bin/activate
 pip install -r requirements.txt
 playwright install chromium
