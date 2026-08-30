@@ -30,7 +30,7 @@ class EconomicNewsAgent:
             self._handle_macro(target_country, country_name)
             return
 
-        # 2. 기업/주식 질문인지 한국거래소(KRX) 및 글로벌 종목 자동 조회!
+        # 2. 상장 기업/주식 질문인지 한국거래소(KRX) 및 미국 주식(SPCX, TSLA 등) 자동 조회!
         res = CompanyResolver.fetch_company_info(user_question)
         if res.get("success"):
             print(f"🤖 1. [Agent 판단]: '{res['name']}' 상장 기업 실시간 분석으로 감지했습니다.")
@@ -38,12 +38,11 @@ class EconomicNewsAgent:
             print(f"📊 [AI Agent 기업 분석 리포트: {res['name']} ({res['symbol']})]")
             print("=" * 65)
             print(f"💰 실시간 현재 주가: {res['price']} {res['currency']}")
-            if res.get("market_cap"):
-                print(f"🏢 시가총액: 약 {res['market_cap'] // 1000000000:,}B ({res['currency']})")
+            print(f"🏢 시가총액(몸값): {res.get('market_cap_str', '정보 없음')}")
             
             news_items = res.get("news", [])
             if not news_items:
-                print(f"\n📰 [{res['name']} 실시간 뉴스 검색 크롤러 가동 중...]")
+                print(f"\n📰 [{res['name']} 실시간 뉴스 크롤러 가동 중...]")
                 news_items = self._crawl_live_news(res['name'])
             
             print(f"\n📰 [{res['name']} 최신 주요 뉴스]:")
@@ -52,7 +51,7 @@ class EconomicNewsAgent:
             print("=" * 65)
             return
 
-        # 3. 비상장사/스타트업/일반 키워드 (예: 스페이스X, 당근마켓, 토스, 쿠팡, 비트코인 등)
+        # 3. 비상장사/일반 키워드 (예: 당근마켓, 토스, 비트코인 등)
         print(f"🤖 1. [Agent 판단]: '{user_question}' 맞춤 키워드 ➔ 실시간 뉴스 검색 크롤러를 가동합니다!")
         news_items = self._crawl_live_news(user_question)
         print(f"✅ 2. [수집 완료]: '{user_question}' 관련 최신 뉴스 {len(news_items)}건 수집 완료.\n")
@@ -128,9 +127,8 @@ if __name__ == "__main__":
     print("🤖 [AI Economic News Agent] 올인원 지능형 에이전트 시작")
     print("=" * 65)
     print("💡 어떤 질문이든 자유롭게 입력해보세요:")
-    print("   - 국내 상장사: '카카오', '두산에너빌리티', '하이브', '현대차' 등")
-    print("   - 해외 상장사: '엔비디아', '테슬라', '애플', 'AMD' 등")
-    print("   - 일반 기업/키워드: '스페이스X', '쿠팡', '당근마켓', '비트코인' 등")
+    print("   - 상장 기업: '스페이스X', '테슬라', '카카오', '엔비디아', '삼성전자' 등")
+    print("   - 비상장 기업/키워드: '당근마켓', '토스', '비트코인' 등")
     print("   - 거시 경제: '미국 경제 뉴스', '한국 경제 뉴스'")
     print("   - 'q' 또는 '종료' 입력 시 종료")
     print("=" * 65)

@@ -11,41 +11,63 @@ class CompanyResolver:
     def load_krx(cls):
         if cls._krx_stocks is None:
             try:
-                # KRX 전체 상장사 목록을 인터넷에서 자동 로드
                 cls._krx_stocks = fdr.StockListing('KRX')[['Code', 'Name', 'Market']]
             except Exception as e:
                 cls._krx_stocks = None
 
     @classmethod
+    def format_market_cap(cls, cap, currency):
+        if not cap or cap == 0:
+            return "정보 없음"
+        if currency == "KRW":
+            # 조 / 억 원 단위 변환
+            jo = cap // 1000000000000
+            eok = (cap % 1000000000000) // 100000000
+            if jo > 0:
+                return f"{jo}조 {eok:,}억 원"
+            return f"{eok:,}억 원"
+        else:
+            # 달러 단위 (억 달러 / 조 달러)
+            billion = cap / 1000000000
+            if billion >= 1000:
+                trillion = billion / 1000
+                return f"약 {trillion:.2f}조 달러 (약 {billion:,.0f}억 달러)"
+            return f"약 {billion:,.1f}억 달러"
+
+    @classmethod
     def resolve_symbol(cls, query: str):
         q = query.lower().strip()
         
-        # 1. 미국 대표 기업 사전
+        # 1. 미국 대표 기업 사전 (스페이스X 공식 SPCX 포함)
         us_map = {
-            "테슬라": "TSLA", "tesla": "TSLA", "애플": "AAPL", "apple": "AAPL",
-            "엔비디아": "NVDA", "nvidia": "NVDA", "마이크로소프트": "MSFT", "msft": "MSFT",
-            "구글": "GOOGL", "google": "GOOGL", "알파벳": "GOOGL",
-            "아마존": "AMZN", "amazon": "AMZN", "메타": "META", "meta": "META",
-            "넷플릭스": "NFLX", "netflix": "NFLX", "amd": "AMD", "인텔": "INTC",
-            "팔란티어": "PLTR", "코카콜라": "KO", "스타벅스": "SBUX", "나이키": "NKE"
+            "스페이스x": "SPCX", "스페이스엑스": "SPCX", "spacex": "SPCX", "spcx": "SPCX",
+            "테슬라": "TSLA", "tesla": "TSLA", "tsla": "TSLA",
+            "애플": "AAPL", "apple": "AAPL", "aapl": "AAPL",
+            "엔비디아": "NVDA", "nvidia": "NVDA", "nvda": "NVDA",
+            "마이크로소프트": "MSFT", "microsoft": "MSFT", "msft": "MSFT",
+            "구글": "GOOGL", "google": "GOOGL", "googl": "GOOGL", "알파벳": "GOOGL",
+            "아마존": "AMZN", "amazon": "AMZN", "amzn": "AMZN",
+            "메타": "META", "meta": "META", "페이스북": "META",
+            "넷플릭스": "NFLX", "netflix": "NFLX", "nflx": "NFLX",
+            "amd": "AMD", "인텔": "INTC", "팔란티어": "PLTR",
+            "로켓랩": "RKLB", "버진갤럭틱": "SPCE",
+            "코카콜라": "KO", "스타벅스": "SBUX", "나이키": "NKE"
         }
         for name, sym in us_map.items():
             if name in q:
                 return sym, name, "US"
 
-        # 2. 영문 티커 직접 입력 (예: TSLA, AAPL, NVDA)
+        # 2. 영문 티커 직접 입력 (예: TSLA, AAPL, NVDA, SPCX 등)
         words = q.upper().split()
         for w in words:
-            if len(w) <= 6 and w.isalpha() and w in ["TSLA", "AAPL", "NVDA", "MSFT", "GOOGL", "AMZN", "META", "NFLX", "AMD", "INTC", "PLTR", "KO", "SBUX", "NKE"]:
+            if len(w) <= 6 and w.isalpha() and w in us_map.values():
                 return w, w, "US"
 
-        # 3. 한국거래소(KRX) 전체 2,500개 상장사 자동 검색!
+        # 3. 한국거래소(KRX) 전체 2,500개 상장사 자동 검색
         cls.load_krx()
         if cls._krx_stocks is not None:
-            # 완전 일치 검색
             match = cls._krx_stocks[cls._krx_stocks['Name'].str.lower() == q]
             if match.empty:
-                # 포함 검색
                 match = cls._krx_stocks[cls._krx_stocks['Name'].apply(lambda x: x.lower() in q or q in x.lower())]
 
             if not match.empty:
@@ -63,14 +85,17 @@ class CompanyResolver:
         if not symbol:
             return {"success": False, "reason": "NOT_FOUND"}
 
-        print(f"📈 [자동 기업 검색] '{query}' ➔ '{name}' ({symbol}) 자동 매핑 성공!")
+        print(f"📈 [상장 기업 실시간 조회] '{query}' ➔ 티커 '{symbol}'")
         try:
             company = yf.Ticker(symbol)
             info = company.info or {}
             
             price = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("previousClose") or "조회중"
             currency = "KRW" if market == "KR" else "USD"
-            market_cap = info.get("marketCap", 0)
+            raw_cap = info.get("marketCap", 0)
+            formatted_cap = cls.format_market_cap(raw_cap, currency)
+
+            company_name = info.get("shortName") or name
 
             news_list = []
             for item in (company.news or [])[:4]:
@@ -83,10 +108,10 @@ class CompanyResolver:
             return {
                 "success": True,
                 "symbol": symbol,
-                "name": name,
+                "name": company_name,
                 "price": price,
                 "currency": currency,
-                "market_cap": market_cap,
+                "market_cap_str": formatted_cap,
                 "news": news_list,
                 "market": market
             }
