@@ -1,16 +1,23 @@
 # 경제 뉴스 수집 소스 정의 (YAML 지시서)
 
 sources:
-  # 1. 미국(US) 경제 뉴스 - 무료 공개 RSS/API 소스
+  # 1. 🇺🇸 미국 경제 종합 뉴스 (API 방식)
   - id: "us_economy_api"
     country: "US"
     topic: "economy"
     type: "api"
     provider: "rss2json_yahoo"
-    # 야후 파이낸스 경제 RSS를 JSON으로 제공하는 공개 엔드포인트
     endpoint: "https://api.rss2json.com/v1/api.json?rss_url=https://finance.yahoo.com/news/rssindex"
 
-  # 2. 미국(US) 경제 뉴스 - 웹 크롤링 소스 (CNBC)
+  # 2. 📈 글로벌 기업 주가 & 최신 뉴스 (yfinance 방식)
+  - id: "global_company_stocks"
+    country: "GLOBAL"
+    topic: "stocks"
+    type: "yfinance"
+    provider: "yahoo_finance_sdk"
+    supported_tickers: ["AAPL", "TSLA", "NVDA", "MSFT", "GOOGL"]
+
+  # 3. 🇺🇸 미국 경제 뉴스 (웹 크롤링 - CNBC)
   - id: "us_economy_crawler"
     country: "US"
     topic: "economy"
@@ -23,7 +30,7 @@ sources:
       title: "a.Card-title, a.RiverHeadline-headline"
       link: "a::attr(href)"
 
-  # 3. 한국(KR) 경제 뉴스 - 웹 크롤링 소스 (네이버 경제)
+  # 4. 🇰🇷 한국 경제 뉴스 (웹 크롤링 - 네이버 경제)
   - id: "kr_economy_crawler"
     country: "KR"
     topic: "economy"
