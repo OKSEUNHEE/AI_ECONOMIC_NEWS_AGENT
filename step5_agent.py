@@ -37,7 +37,7 @@ class EconomicNewsAgent:
             print("\n" + "=" * 65)
             print(f"📊 [AI Agent 기업 분석 리포트: {res['name']} ({res['symbol']})]")
             print("=" * 65)
-            print(f"💰 실시간 현재 주가: {res['price']} {res['currency']}")
+            print(f"💰 실시간 현재 가격: {res['price']}")
             print(f"🏢 시가총액(몸값): {res.get('market_cap_str', '정보 없음')}")
             
             news_items = res.get("news", [])

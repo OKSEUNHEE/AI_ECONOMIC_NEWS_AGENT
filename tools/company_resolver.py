@@ -1,9 +1,10 @@
 import os
 import yfinance as yf
 import FinanceDataReader as fdr
+import pandas as pd
 
 class CompanyResolver:
-    """한국거래소(KRX) 2,500개 전체 상장사 및 미국 주요 종목을 자동으로 매핑해주는 도구"""
+    """한국거래소(KRX 2,500개 주식 + 1,163개 ETF) 및 미국 전 종목/ETF 실시간 매핑 도구"""
 
     _krx_stocks = None
 
@@ -11,23 +12,28 @@ class CompanyResolver:
     def load_krx(cls):
         if cls._krx_stocks is None:
             try:
-                cls._krx_stocks = fdr.StockListing('KRX')[['Code', 'Name', 'Market']]
+                # 1. 주식 종목
+                stocks = fdr.StockListing('KRX')[['Code', 'Name', 'Market']]
+                # 2. 국내 ETF 종목
+                etfs = fdr.StockListing('ETF/KR')[['Symbol', 'Name']]
+                etfs = etfs.rename(columns={'Symbol': 'Code'})
+                etfs['Market'] = 'ETF'
+                
+                cls._krx_stocks = pd.concat([stocks, etfs], ignore_index=True)
             except Exception as e:
                 cls._krx_stocks = None
 
     @classmethod
     def format_market_cap(cls, cap, currency):
         if not cap or cap == 0:
-            return "정보 없음"
+            return "ETF/지수 펀드 (순자산 기준)"
         if currency == "KRW":
-            # 조 / 억 원 단위 변환
             jo = cap // 1000000000000
             eok = (cap % 1000000000000) // 100000000
             if jo > 0:
                 return f"{jo}조 {eok:,}억 원"
             return f"{eok:,}억 원"
         else:
-            # 달러 단위 (억 달러 / 조 달러)
             billion = cap / 1000000000
             if billion >= 1000:
                 trillion = billion / 1000
@@ -38,43 +44,41 @@ class CompanyResolver:
     def resolve_symbol(cls, query: str):
         q = query.lower().strip()
         
-        # 1. 미국 대표 기업 사전 (스페이스X 공식 SPCX 포함)
+        # 1. 미국 대표 주식 및 인기 ETF
         us_map = {
-            "스페이스x": "SPCX", "스페이스엑스": "SPCX", "spacex": "SPCX", "spcx": "SPCX",
-            "테슬라": "TSLA", "tesla": "TSLA", "tsla": "TSLA",
-            "애플": "AAPL", "apple": "AAPL", "aapl": "AAPL",
-            "엔비디아": "NVDA", "nvidia": "NVDA", "nvda": "NVDA",
-            "마이크로소프트": "MSFT", "microsoft": "MSFT", "msft": "MSFT",
-            "구글": "GOOGL", "google": "GOOGL", "googl": "GOOGL", "알파벳": "GOOGL",
-            "아마존": "AMZN", "amazon": "AMZN", "amzn": "AMZN",
-            "메타": "META", "meta": "META", "페이스북": "META",
-            "넷플릭스": "NFLX", "netflix": "NFLX", "nflx": "NFLX",
-            "amd": "AMD", "인텔": "INTC", "팔란티어": "PLTR",
-            "로켓랩": "RKLB", "버진갤럭틱": "SPCE",
-            "코카콜라": "KO", "스타벅스": "SBUX", "나이키": "NKE"
+            "spy": "SPY", "qqq": "QQQ", "soxx": "SOXX", "smh": "SMH",
+            "schd": "SCHD", "voo": "VOO", "ivv": "IVV", "tlt": "TLT",
+            "tqqq": "TQQQ", "sqqq": "SQQQ", "dia": "DIA", "arkk": "ARKK",
+            "스페이스x": "SPCX", "spacex": "SPCX", "spcx": "SPCX",
+            "테슬라": "TSLA", "애플": "AAPL", "엔비디아": "NVDA",
+            "마이크로소프트": "MSFT", "구글": "GOOGL", "아마존": "AMZN",
+            "메타": "META", "넷플릭스": "NFLX", "amd": "AMD", "인텔": "INTC",
+            "팔란티어": "PLTR", "코카콜라": "KO", "스타벅스": "SBUX"
         }
         for name, sym in us_map.items():
-            if name in q:
-                return sym, name, "US"
+            if name == q:
+                return sym, sym, "US"
 
-        # 2. 영문 티커 직접 입력 (예: TSLA, AAPL, NVDA, SPCX 등)
-        words = q.upper().split()
-        for w in words:
-            if len(w) <= 6 and w.isalpha() and w in us_map.values():
-                return w, w, "US"
+        # 2. 영문 1~5자리 미국 티커
+        clean_q = query.strip().upper()
+        if clean_q.isalpha() and 1 <= len(clean_q) <= 5:
+            return clean_q, clean_q, "US"
 
-        # 3. 한국거래소(KRX) 전체 2,500개 상장사 자동 검색
+        # 3. 한국 전체 주식(2,500개) + 한국 전체 ETF(1,163개)
         cls.load_krx()
         if cls._krx_stocks is not None:
-            match = cls._krx_stocks[cls._krx_stocks['Name'].str.lower() == q]
+            q_nospace = q.replace(" ", "")
+            # 완전 일치
+            match = cls._krx_stocks[cls._krx_stocks['Name'].str.lower().str.replace(" ", "") == q_nospace]
             if match.empty:
-                match = cls._krx_stocks[cls._krx_stocks['Name'].apply(lambda x: x.lower() in q or q in x.lower())]
+                # 포함 일치
+                match = cls._krx_stocks[cls._krx_stocks['Name'].apply(lambda x: q_nospace in x.lower().replace(" ", ""))]
 
             if not match.empty:
                 row = match.iloc[0]
                 code = row['Code']
                 market = row['Market']
-                suffix = ".KS" if market == "KOSPI" else ".KQ"
+                suffix = ".KS" if market in ["KOSPI", "KOSPI200", "ETF"] else ".KQ"
                 return f"{code}{suffix}", row['Name'], "KR"
 
         return None, None, None
@@ -85,20 +89,39 @@ class CompanyResolver:
         if not symbol:
             return {"success": False, "reason": "NOT_FOUND"}
 
-        print(f"📈 [상장 기업 실시간 조회] '{query}' ➔ 티커 '{symbol}'")
+        print(f"📈 [실시간 가격/뉴스 조회] '{query}' ➔ 티커 '{symbol}'")
         try:
-            company = yf.Ticker(symbol)
-            info = company.info or {}
-            
-            price = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("previousClose") or "조회중"
-            currency = "KRW" if market == "KR" else "USD"
-            raw_cap = info.get("marketCap", 0)
-            formatted_cap = cls.format_market_cap(raw_cap, currency)
+            ticker = yf.Ticker(symbol)
+            price = None
+            try:
+                price = ticker.fast_info.get("lastPrice") or ticker.fast_info.get("regularMarketPrice")
+            except:
+                pass
 
-            company_name = info.get("shortName") or name
+            if not price:
+                try:
+                    hist = ticker.history(period="1d")
+                    if not hist.empty:
+                        price = hist['Close'].iloc[-1]
+                except:
+                    pass
+
+            info = ticker.info or {}
+            if not price:
+                price = info.get("currentPrice") or info.get("regularMarketPrice") or info.get("navPrice") or info.get("previousClose")
+
+            currency = "KRW" if market == "KR" else "USD"
+            if isinstance(price, (int, float)):
+                price_str = f"{price:,.0f} 원" if currency == "KRW" else f"${price:,.2f}"
+            else:
+                price_str = str(price) if price else "조회중"
+
+            raw_cap = info.get("marketCap") or ticker.fast_info.get("marketCap", 0)
+            formatted_cap = cls.format_market_cap(raw_cap, currency)
+            company_name = info.get("shortName") or info.get("longName") or name
 
             news_list = []
-            for item in (company.news or [])[:4]:
+            for item in (ticker.news or [])[:4]:
                 title = item.get("title") or (item.get("content", {}).get("title") if isinstance(item.get("content"), dict) else "")
                 link = item.get("link") or (item.get("content", {}).get("canonicalUrl", {}).get("url") if isinstance(item.get("content"), dict) else "")
                 pub = item.get("publisher") or (item.get("content", {}).get("provider", {}).get("displayName") if isinstance(item.get("content"), dict) else "Yahoo")
@@ -109,7 +132,7 @@ class CompanyResolver:
                 "success": True,
                 "symbol": symbol,
                 "name": company_name,
-                "price": price,
+                "price": price_str,
                 "currency": currency,
                 "market_cap_str": formatted_cap,
                 "news": news_list,
