@@ -18,7 +18,7 @@ class EconomicNewsAgent:
 
         q = user_question.lower()
 
-        # 1. 거시 경제 질문인지 먼저 확인 (미국 vs 한국)
+        # 1. 거시 경제 질문인지 확인 (미국 vs 한국)
         if any(k in q for k in ["미국 경제", "미국 뉴스", "us economy", "미국 증시", "연준"]):
             target_country = "US"
             country_name = "미국"
@@ -33,7 +33,7 @@ class EconomicNewsAgent:
         # 2. 기업/주식 질문인지 한국거래소(KRX) 및 글로벌 종목 자동 조회!
         res = CompanyResolver.fetch_company_info(user_question)
         if res.get("success"):
-            print("🤖 1. [Agent 판단]: '상장 기업 실시간 분석'으로 자동 감지했습니다.")
+            print(f"🤖 1. [Agent 판단]: '{res['name']}' 상장 기업 실시간 분석으로 감지했습니다.")
             print("\n" + "=" * 65)
             print(f"📊 [AI Agent 기업 분석 리포트: {res['name']} ({res['symbol']})]")
             print("=" * 65)
@@ -41,11 +41,10 @@ class EconomicNewsAgent:
             if res.get("market_cap"):
                 print(f"🏢 시가총액: 약 {res['market_cap'] // 1000000000:,}B ({res['currency']})")
             
-            # 뉴스가 있는 경우 출력, 없는 경우 네이버 크롤러로 자동 보강
             news_items = res.get("news", [])
             if not news_items:
-                print(f"\n📰 [{res['name']} 네이버 실시간 뉴스 검색 중...]")
-                news_items = self._crawl_naver_news(res['name'])
+                print(f"\n📰 [{res['name']} 실시간 뉴스 검색 크롤러 가동 중...]")
+                news_items = self._crawl_live_news(res['name'])
             
             print(f"\n📰 [{res['name']} 최신 주요 뉴스]:")
             for idx, item in enumerate(news_items[:3], 1):
@@ -53,9 +52,9 @@ class EconomicNewsAgent:
             print("=" * 65)
             return
 
-        # 3. 상장사에 없는 일반 기업/스타트업/키워드 (예: 당근마켓, 토스, 쿠팡, 비트코인 등) ➔ 네이버 뉴스 검색 자동 크롤링!
-        print(f"🤖 1. [Agent 판단]: '{user_question}' 맞춤 키워드 ➔ 네이버 실시간 검색 크롤러 가동!")
-        news_items = self._crawl_naver_news(user_question)
+        # 3. 비상장사/스타트업/일반 키워드 (예: 스페이스X, 당근마켓, 토스, 쿠팡, 비트코인 등)
+        print(f"🤖 1. [Agent 판단]: '{user_question}' 맞춤 키워드 ➔ 실시간 뉴스 검색 크롤러를 가동합니다!")
+        news_items = self._crawl_live_news(user_question)
         print(f"✅ 2. [수집 완료]: '{user_question}' 관련 최신 뉴스 {len(news_items)}건 수집 완료.\n")
         print("=" * 65)
         print(f"📰 [AI Agent '{user_question}' 실시간 뉴스 브리핑]")
@@ -64,29 +63,27 @@ class EconomicNewsAgent:
             print(f"{idx}. {item['title']} [{item['publisher']}]")
         print("=" * 65)
 
-    def _crawl_naver_news(self, keyword):
-        encoded_query = quote(keyword)
-        search_url = f"https://search.naver.com/search.naver?where=news&query={encoded_query}"
+    def _crawl_live_news(self, keyword):
+        search_url = f"https://search.daum.net/search?w=news&q={quote(keyword)}"
         results = []
         try:
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
                 page = browser.new_page()
                 page.goto(search_url, wait_until="domcontentloaded")
-                page.wait_for_timeout(1500)
-                html = page.content()
-                browser.close()
+                page.wait_for_timeout(1000)
 
-            soup = BeautifulSoup(html, "lxml")
-            for item in soup.select("ul.list_news > li, div.news_wrap"):
-                t_elem = item.select_one("a.news_tit")
-                p_elem = item.select_one("a.info.press")
-                if t_elem:
-                    results.append({
-                        "title": t_elem.get_text(strip=True),
-                        "publisher": p_elem.get_text(strip=True) if p_elem else "언론사",
-                        "link": t_elem.get("href", "")
-                    })
+                links = page.locator("div.item-title a, a[class*='tit_main'], strong.tit-g a").all()
+                for l in links:
+                    t = l.inner_text().strip()
+                    h = l.get_attribute("href") or ""
+                    if len(t) > 6 and h and not any(r["title"] == t for r in results):
+                        results.append({
+                            "title": t,
+                            "publisher": "실시간 뉴스",
+                            "link": h
+                        })
+                browser.close()
         except Exception as e:
             print(f"크롤링 중 오류: {e}")
         return results
@@ -133,7 +130,7 @@ if __name__ == "__main__":
     print("💡 어떤 질문이든 자유롭게 입력해보세요:")
     print("   - 국내 상장사: '카카오', '두산에너빌리티', '하이브', '현대차' 등")
     print("   - 해외 상장사: '엔비디아', '테슬라', '애플', 'AMD' 등")
-    print("   - 일반 기업/키워드: '쿠팡', '당근마켓', '토스', '비트코인' 등")
+    print("   - 일반 기업/키워드: '스페이스X', '쿠팡', '당근마켓', '비트코인' 등")
     print("   - 거시 경제: '미국 경제 뉴스', '한국 경제 뉴스'")
     print("   - 'q' 또는 '종료' 입력 시 종료")
     print("=" * 65)
